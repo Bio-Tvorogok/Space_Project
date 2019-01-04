@@ -14,6 +14,10 @@ public class DestoyContact : MonoBehaviour
     [SerializeField]
     private bool enable_failure = false;
 
+    [Tooltip("Дебаг")]
+    [SerializeField]
+    private bool enable_debug = false;
+
     [Tooltip("Максимальное количество изломов в прямой")]
     [SerializeField]
     [Range(0, 6)]
@@ -135,7 +139,17 @@ public class DestoyContact : MonoBehaviour
             {
                 if ((isSide == null) || (node.Second.Second != null))
                 {
-                    var broken_list = BrokenLineDestructor(node.First, node.Second.First, vertices, nodes, 0.3f, node.Second.Second);
+                    List<Pair<Vector3, Pair<Vector3, bool?>>> broken_list;
+
+                    if (enable_debug)
+                    {
+                        if (isSide == null)
+                            broken_list = BrokenLineDestructor(node.First, node.Second.First, vertices, nodes, 0.3f, node.Second.Second, true);
+                        else
+                            broken_list = BrokenLineDestructor(node.First, node.Second.First, vertices, nodes, 0.3f, node.Second.Second, false);
+                    } else
+                        broken_list = BrokenLineDestructor(node.First, node.Second.First, vertices, nodes, 0.3f, node.Second.Second);
+
                     if (broken_list != null)
                     {
                         var asteroids = AsteroidSeparetor(vertices, broken_list);
@@ -188,8 +202,9 @@ public class DestoyContact : MonoBehaviour
     }
 
     // Подбор точек для ломаной линии
-    private List<Pair<Vector3, Pair<Vector3, bool?>>> BrokenLineDestructor(Vector3 start_point, Vector2 direction, List<Vector3> vertices, int nodes, float angular_shift = 0.1f, bool? isTwisted = false)
+    private List<Pair<Vector3, Pair<Vector3, bool?>>> BrokenLineDestructor(Vector3 start_point, Vector2 direction, List<Vector3> vertices, int nodes, float angular_shift = 0.1f, bool? isTwisted = false, bool isFirstDebug = false)
     {
+
         var current_start = start_point;
         Vector2 current_direction = direction;
         if (isTwisted == true) current_direction = RandomDirection(direction, 1.4f, -0.4f);
@@ -221,8 +236,14 @@ public class DestoyContact : MonoBehaviour
             }
             node_list.Add(new Pair<Vector3, Pair<Vector3, bool?>>(contact.Second.Value, null));
 
-            for (int i = 1; i < node_list.Count; i++)
-                Debug.DrawLine(node_list[i - 1].First, node_list[i].First, Color.blue, 1000000, false);
+            if (enable_debug)
+                for (int i = 1; i < node_list.Count; i++)
+                {
+                    if (isFirstDebug)
+                        Debug.DrawLine(node_list[i - 1].First, node_list[i].First, Color.red, 1000000, false);
+                    else
+                        Debug.DrawLine(node_list[i - 1].First, node_list[i].First, Color.blue, 1000000, false);
+                }
 
             //if (node_list.Count > 2)
             //    GetTwoPointEx(new Pair<Vector3, Vector3>(node_list[0].First, node_list[NextIterator(0, node_list.Count)].Second.First),
@@ -381,18 +402,26 @@ public class DestoyContact : MonoBehaviour
     // Точка пересечения
     private Vector3? IntersectionPoint(Vector3 start_point_1, Vector3 end_point_1, Vector3 start_point_2, Vector3 end_point_2)
     {
-        if (IsSide(start_point_1, end_point_1, start_point_2) != IsSide(start_point_1, end_point_1, end_point_2))
-            if (IsSide(start_point_2, end_point_2, start_point_1) != IsSide(start_point_2, end_point_2, end_point_1))
-            {
-                var x = -((start_point_1.x * end_point_1.y - end_point_1.x * start_point_1.y) * (end_point_2.x - start_point_2.x)
-                    - (start_point_2.x * end_point_2.y - end_point_2.x * start_point_2.y) * (end_point_1.x - start_point_1.x)) /
-                    ((start_point_1.y - end_point_1.y) * (end_point_2.x - start_point_2.x) - (start_point_2.y - end_point_2.y) *
-                    (end_point_1.x - start_point_1.x));
-                var y = ((start_point_2.y - end_point_2.y) * (-x) - (start_point_2.x * end_point_2.y - end_point_2.x * start_point_2.y)) /
-                    (end_point_2.x - start_point_2.x);
-                return new Vector3(x, y);
-            }
-        return null;
+        Vector3 cut1 = end_point_1 - start_point_1;
+        Vector3 cut2 = end_point_2 - start_point_2;
+        Vector3 prod1, prod2;
+
+        prod1 = Vector3.Cross(cut1, (start_point_2 - start_point_1));
+        prod2 = Vector3.Cross(cut1, (end_point_2 - start_point_1));
+
+        if (Mathf.Sign(prod1.z) == Mathf.Sign(prod2.z))
+            return null;
+
+        prod1 = Vector3.Cross(cut2, (start_point_1 - start_point_2));
+        prod2 = Vector3.Cross(cut2, (end_point_1 - start_point_2));
+
+        if (Mathf.Sign(prod1.z) == Mathf.Sign(prod2.z))
+            return null;
+
+        var x = start_point_1.x + cut1.x * Mathf.Abs(prod1.z) / Mathf.Abs(prod2.z - prod1.z);
+        var y = start_point_1.y + cut1.y * Mathf.Abs(prod1.z) / Mathf.Abs(prod2.z - prod1.z);
+
+        return new Vector3(x, y);
     }
 
     // Положение относительно прямой
