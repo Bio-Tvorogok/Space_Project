@@ -74,9 +74,6 @@ public class DestoyContact : MonoBehaviour
             var contact_energy = collision.relativeVelocity.magnitude;
             if ((contact_energy > min_energy) && (GetComponent<Rigidbody2D>().mass > mass_block))
             {
-               // Gizmos.color = Color.blue;
-               // Gizmos.matrix.
-
                 var contact = LocalContact(collision.contacts[0].point, false);
                 var mesh = GetComponent<MeshFilter>().mesh;
                 var vertices = new List<Vector3>(mesh.vertices);
@@ -104,9 +101,6 @@ public class DestoyContact : MonoBehaviour
                 var new_object = Instantiate(shape_prefab) as Transform;
                 var shape_generate = new_object.GetComponent<ShapeGenerete>();
                 var rigid_body = new_object.GetComponent<Rigidbody2D>();
-
-                //rigid_body.isKinematic = true;
-
                 shape_generate.SetVertices(vertices);
                 shape_generate.MatherialColor = GetComponent<ShapeGenerete>().MatherialColor;
                 rigid_body.velocity = GetComponent<Rigidbody2D>().velocity;
@@ -207,16 +201,29 @@ public class DestoyContact : MonoBehaviour
 
         var current_start = start_point;
         Vector2 current_direction = direction;
+
         if (isTwisted == true) current_direction = RandomDirection(direction, 1.4f, -0.4f);
         else if (isTwisted == false) current_direction = RandomDirection(direction, -0.4f, 1.4f);
-        var contact = GetTwoPoint(new Pair<Vector3, Vector3>(current_start, current_direction), vertices);
+
+        Pair<Vector3?, Vector3?> contact;
+       
+        if (isTwisted == null)
+            contact = GetTwoPoint(new Pair<Vector3, Vector3>(current_start, current_direction), vertices, true);
+        else
+            contact = GetTwoPoint(new Pair<Vector3, Vector3>(current_start, current_direction), vertices, false);
+            
+
         if ((contact.First != null) && (contact.Second != null))
         {
-            var node_list = new List<Pair<Vector3, Pair<Vector3, bool?>>> { new Pair<Vector3, Pair<Vector3, bool?>>(current_start, null) };
+            List<Pair<Vector3, Pair<Vector3, bool?>>> node_list;
+            // Если контакт первый (основная линия) то мы предполагаем, что unity херовый движок и он сместит это точку из-за коллизии
+            // поэтому мы добовляем в ломаную точку пересечения, а не косячную точку касания 
+            if (isTwisted == null)
+                node_list = new List<Pair<Vector3, Pair<Vector3, bool?>>> { new Pair<Vector3, Pair<Vector3, bool?>>(contact.First.Value, null) };
+            else
+                node_list = new List<Pair<Vector3, Pair<Vector3, bool?>>> { new Pair<Vector3, Pair<Vector3, bool?>>(current_start, null) };
             if ((contact.Second.Value - contact.First.Value).magnitude < magnitude_block)
                 nodes = 0;
-            //var custom_nodes = (int)Mathf.Round((contact.Second.Value - contact.First.Value).magnitude * 1.5f);
-            //if (nodes > custom_nodes) nodes = custom_nodes;
             for (int i = 0; i < nodes; i++)
             {
                 var node_vector = contact.Second.Value - contact.First.Value;
@@ -237,13 +244,44 @@ public class DestoyContact : MonoBehaviour
             node_list.Add(new Pair<Vector3, Pair<Vector3, bool?>>(contact.Second.Value, null));
 
             if (enable_debug)
+            {
+               
+                Debug.Log("Line Nodes +++");
+                if (node_list[0].First != null)
+                {
+                    if (node_list[0].Second != null)
+                    {
+                        if (node_list[0].Second.Second != null)
+                            Debug.Log("point: " + node_list[0].First + ", dir: " + node_list[0].Second.First + ", twist: " + node_list[0].Second.Second.Value);
+                        else
+                            Debug.Log("point: " + node_list[0].First + ", dir: " + node_list[0].Second.First);
+                    }
+                    else
+                        Debug.Log("point: " + node_list[0].First);
+                }
                 for (int i = 1; i < node_list.Count; i++)
                 {
+
                     if (isFirstDebug)
                         Debug.DrawLine(node_list[i - 1].First, node_list[i].First, Color.red, 1000000, false);
                     else
                         Debug.DrawLine(node_list[i - 1].First, node_list[i].First, Color.blue, 1000000, false);
+
+                    if (node_list[i].First != null)
+                    {
+                        if (node_list[i].Second != null)
+                        {
+                            if (node_list[i].Second.Second != null)
+                                Debug.Log("point: " + node_list[i].First + ", dir: " + node_list[i].Second.First + ", twist: " + node_list[i].Second.Second.Value);
+                            else
+                                Debug.Log("point: " + node_list[i].First + ", dir: " + node_list[i].Second.First);
+                        }
+                        else
+                            Debug.Log("point: " + node_list[i].First);
+                    }
                 }
+                Debug.Log("Line Nodes ---");
+            }
 
             //if (node_list.Count > 2)
             //    GetTwoPointEx(new Pair<Vector3, Vector3>(node_list[0].First, node_list[NextIterator(0, node_list.Count)].Second.First),
@@ -251,8 +289,13 @@ public class DestoyContact : MonoBehaviour
             //else
             //{
             current_direction = node_list[node_list.Count - 1].First - node_list[0].First;
-             GetTwoPoint(new Pair<Vector3, Vector3>(node_list[0].First, current_direction), vertices);
-            //}
+           // contact = GetTwoPoint(new Pair<Vector3, Vector3>(current_start, current_direction), vertices);
+            
+            if (isTwisted == null)
+                GetTwoPoint(new Pair<Vector3, Vector3>(node_list[0].First, current_direction), vertices, true, true);
+            else
+                GetTwoPoint(new Pair<Vector3, Vector3>(node_list[0].First, current_direction), vertices);
+           
             return node_list;
         }
         return null;
@@ -297,7 +340,7 @@ public class DestoyContact : MonoBehaviour
 
     // Получение двух точек пересечения
     private Pair<Vector3?, Vector3?> GetTwoPoint(Pair<Vector3, Vector3> start, List<Vector3> vertices,
-        bool isStartIntersected = true)
+        bool isStartIntersected = true, bool isMain = false)
     {
         vertices.Remove(start.First);
         var two_points = new Pair<Vector3?, Vector3?>(null, null);
@@ -317,28 +360,52 @@ public class DestoyContact : MonoBehaviour
             var target = IntersectionPoint(start_current, end_current, start_new, end_new);
             if (target != null)
             {
-                // Добавление близжайших точек персечения и их индексы
-                if (two_points.First == null)
+                var side_res = IsSideByDir(start.First, start.Second, target.Value);
+                if (side_res != null)
                 {
-                    two_points.First = target.Value;
-                    global_intersection.First = i;
-                }
-                else if ((target.Value - start.First).magnitude < (two_points.First.Value - start.First).magnitude)
-                {
-                    two_points.Second = two_points.First;
-                    two_points.First = target.Value;
-                    global_intersection.Second = global_intersection.First;
-                    global_intersection.First = i;
-                }
-                else if (two_points.Second == null)
-                {
-                    two_points.Second = target.Value;
-                    global_intersection.Second = i;
-                }
-                else if ((target.Value - start.First).magnitude < (two_points.Second.Value - start.First).magnitude)
-                {
-                    two_points.Second = target.Value;
-                    global_intersection.Second = i;
+                    // Добавление близжайших точек персечения и их индексы
+                    if (two_points.First == null)
+                    {
+                        two_points.First = target.Value;
+                        global_intersection.First = i;
+                    }
+                    else
+                    {
+                        if ((target.Value - start.First).magnitude < (two_points.First.Value - start.First).magnitude)
+                        {
+                            var prev_point = two_points.First;
+                            var global_save = global_intersection.First;
+                            two_points.First = target.Value;
+                            global_intersection.First = i;
+
+                            var prev_side_res = IsSideByDir(start.First, start.Second, prev_point.Value);
+                            if (prev_side_res != null)
+                                if (prev_side_res.Value)
+                                {
+                                    two_points.Second = prev_point;
+                                    global_intersection.Second = global_save;
+                                }
+                        }
+                        else
+                        {
+                            if (side_res.Value)
+                            {
+                                if (two_points.Second == null)
+                                {
+                                    two_points.Second = target.Value;
+                                    global_intersection.Second = i;
+                                }
+                                else
+                                {
+                                    if ((target.Value - start.First).magnitude < (two_points.Second.Value - start.First).magnitude)
+                                    {
+                                        two_points.Second = target.Value;
+                                        global_intersection.Second = i;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -347,57 +414,10 @@ public class DestoyContact : MonoBehaviour
         {
             two_points.Second = two_points.First;
             two_points.First = start.First;
+            //NextIterator(global_intersection.Second, vertices.Count);
         }
         return two_points;
     }
-
-    /*
-    private void GetTwoPointEx(Pair<Vector3, Vector3> start, Pair<Vector3, Vector3> end, List<Vector3> vertices)
-    {
-        //vertices.Remove(start.First);
-        var two_points = new Pair<Vector3?, Vector3?>(null, null);
-
-        var start_one_current = start.First - start.Second;
-        var end_one_current = start.First + start.Second;
-
-        var start_two_current = end.First;
-        var end_two_current = end.First + end.Second * 10;
-
-        for (int i = 0; i < vertices.Count - 1; i++)
-        {
-            var start_new = vertices[i];
-            var end_new = vertices[NextIterator(i, vertices.Count)];
-            var target = IntersectionPoint(start_one_current, end_one_current, start_new, end_new);
-            if (target != null)
-            {
-                if (two_points.First == null)
-                {
-                    two_points.First = target.Value;
-                    global_intersection.First = i;
-                }
-                else if ((target.Value - start.First).magnitude < (two_points.First.Value - start.First).magnitude)
-                {
-                    two_points.First = target.Value;
-                    global_intersection.First = i;
-                }
-            }
-            target = IntersectionPoint(start_two_current, end_two_current, start_new, end_new);
-            if (target != null)
-            {
-                if (two_points.Second == null)
-                {
-                    two_points.Second = target.Value;
-                    global_intersection.Second = i;
-                }
-                else if ((target.Value - end.First).magnitude < (two_points.Second.Value - end.First).magnitude)
-                {
-                    two_points.Second = target.Value;
-                    global_intersection.Second = i;
-                }
-            }
-        }
-    }
-    */
 
     // Точка пересечения
     private Vector3? IntersectionPoint(Vector3 start_point_1, Vector3 end_point_1, Vector3 start_point_2, Vector3 end_point_2)
@@ -433,6 +453,34 @@ public class DestoyContact : MonoBehaviour
         else return null;
     }
 
+    private bool? IsSideByDir(Vector3 start, Vector3 dir, Vector3 point)
+    {
+        if ((dir.x != 0) || (dir.y != 0)) {
+            float y = 0;
+            float x = 0;
+            Vector3 ort_dir = Vector3.zero;
+            if (Mathf.Abs(dir.x) >= Mathf.Abs(dir.y))
+            {
+                y = 1;
+                x = -(dir.y * y) / dir.x;
+                if (dir.x < 0)
+                    ort_dir = new Vector3(x, y);
+                else
+                    ort_dir = new Vector3(-x, -y);
+            } else
+            {
+                x = 1;
+                y = -(dir.x * x) / dir.y;
+                if (dir.y > 0)
+                    ort_dir = new Vector3(x, y);
+                else
+                    ort_dir = new Vector3(-x, -y);
+            }
+            return IsSide(start, ort_dir + start, point);
+        }
+        return null;
+    }
+
     // Следующий итератор
     private int NextIterator(int iterator, int maxLength)
     {
@@ -462,7 +510,12 @@ public class DestoyContact : MonoBehaviour
     {
         var angle = Vector2.Angle(Vector2.right, direction) * Mathf.PI / 180;
         if (direction.y < 0) angle = 2 * Mathf.PI - angle;
-        angle += Random.Range(-angular_right, angular_left);
+        //angle += Random.Range(-angular_right, angular_left);
+        //if (custom)
+            angle += Random.Range(-angular_right, angular_left);
+       // else
+           // angle += 0.3f;
+            
         //angle += angular;
         angle = angle % (2 * Mathf.PI);
         if (angle < 0) angle = 2 * Mathf.PI + angle;

@@ -55,6 +55,7 @@
   <ItemGroup>
      <Compile Include="Assets\Scripts\AsteroidGenerator.cs" />
      <Compile Include="Assets\Scripts\CameraScript.cs" />
+     <Compile Include="Assets\Scripts\ClearOnContact_Test.cs" />
      <Compile Include="Assets\Scripts\DeneratorTest.cs" />
      <Compile Include="Assets\Scripts\DestoyContact.cs" />
      <Compile Include="Assets\Scripts\ParticleScript.cs" />

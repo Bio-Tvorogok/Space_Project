@@ -143,6 +143,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   shape_prefab: {fileID: 4444256426895206, guid: e2ca2bbce61700d49a645ba3f63e201d,
     type: 3}
+  bullet_prefab: {fileID: 2843997998077795245, guid: c8ef9c9af6dd2d8428a3261bb4b6ef60,
+    type: 3}
 --- !u!4 &233435675
 Transform:
   m_ObjectHideFlags: 0
@@ -238,7 +240,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 770158689}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -15.99, y: -8.3, z: -10}
+  m_LocalPosition: {x: -9.7, y: -5.1, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
